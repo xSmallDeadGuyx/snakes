@@ -22,7 +22,7 @@ app.get('/local', function (req, res) {
 	res.sendfile(__dirname + '/snakes.html');
 });
 var players = {};
-var universe = new World(1000, 800);
+var universe = new World(2000, 2000);
 
 var snakes = [];
 
@@ -32,9 +32,12 @@ io.sockets.on('connection', function (socket) {
 	var name;
 	var snake;
 	socket.on('join', function(n, callback) {
-		if(!(n in players)) {
+		n = n + "";
+		if(n.length < 3) {
+			callback(false, true);
+		} else if(!(n in players)) {
 			name = n;
-			console.log("Name set!");
+			console.log("Player joined:", n);
 
 			universe.entities.forEach(function(e) {
 				socket.emit('entityadded', {
@@ -74,6 +77,7 @@ io.sockets.on('connection', function (socket) {
 	socket.on('disconnect', function () {
 		if(name) {
 			socket.broadcast.emit('playerquit', {name: name});
+			console.log("Player quit:", name);
 			snake.balls.forEach(function(b) {
 				universe.removeEntity(b);
 			})
@@ -99,6 +103,8 @@ universe.onEntityAdded.updateClients = function(e) {
 }
 updateClients = function() {
 	var data = {};
+	data.e = {};
+	data.s = {};
 	universe.entities.forEach(function(e) {
 		var entityUpdate = {};
 		entityUpdate.pos = e.position;
@@ -109,8 +115,15 @@ updateClients = function() {
 			if(e == e.ownerSnake.head) entityUpdate.head = true;
 		}
 
-		data[e._id] = entityUpdate;
+		data.e[e._id] = entityUpdate;
 	});
+	// Object.forEach(players, function(snake, name) {
+	// 	data.s[name] = snake.balls.pluck('_id');
+	// });
+	Object.forEach(players, function(snake, name) {
+	 	data.s[name] = snake.head._id;
+	});
+
 	io.sockets.emit('entityupdates', data);
 }
 var randomInt = function(min, max) {
@@ -166,7 +179,19 @@ i = setInterval(function() {
 	});
 	updateClients();
 	lastt = t;
-}, 1000 / 60.0)
+}, 1000 / 60.0);
+
+setInterval(function() {
+	scores = []
+	var mass = universe.totalMass;
+	Object.forEach(players, function(s, name) {
+		scores.push([name, Math.round(1000*s.mass / mass), s.color.toString()])
+	});
+	scores.sort(function(a, b){ 
+		return a[1] > b[1] ? 1 : a[1] < b[1] ? -1 : 0;
+	});
+	io.sockets.emit('scores', scores);
+}, 500);
 
 
 var stdin = process.openStdin();
@@ -175,11 +200,11 @@ stdin.on('data', function(chunk) {
 	if(/^\s*players/.test(chunk)) {
 		console.log(Object.keys(players).join(', '));
 	} else if(/^\s*mass/.test(chunk)) {
-		console.log('Total mass of the universe: '+universe.totalMass());
+		console.log('Total mass of the universe: '+universe.totalMass);
 	} else if(matches = /^\s*balls (\d+)/.exec(chunk)) {
 		generateBalls(+matches[1]);
 	} else {
 		console.log("sending message");
-		io.sockets.emit('servermessage', "> "+chunk);
+		io.sockets.emit('servermessage', ""+chunk);
 	}
 });

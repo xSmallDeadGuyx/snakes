@@ -8,17 +8,54 @@
 		<script src="color.js"></script>
 		<script src="ball.js"></script>
 		<script src="world.js"></script>
-		<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>
+		<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Terminal+Dosis+Light|Ubuntu:300|Ubuntu:300italic" />
 		<style>
-			html, body {background: #202020; width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden}
-			#message {background: #c0c0c0; font-size: 20px; color: #202020; font-family: sans-serif; }
+			html, body {
+				background: #202020; width: 100%; height: 100%; margin: 0; padding: 0;
+				font-family: 'Terminal Dosis Light', Arial, sans-serif;
+			}
+			#message {
+				color: white;
+				position: absolute;
+				top:0;
+				left: 0;
+				right: 0;
+				font-size: 30px;
+				text-align: center;
+			}
+			#scores {
+				position: absolute;
+				bottom: 5px;
+				left: 0;
+				right: 0;
+				font-size: 30px;
+				line-height: 35px;
+				padding: 0;
+				margin: 0;
+				width: 100%;
+				display: table;
+			}
+			#scores li {
+				display: table-row;
+				color: white;
+			}
+			#scores li span {
+				display: table-cell;
+				width: 50%;
+			}
+			#scores li span.name {
+				font-weight: bold;
+				text-align: right;
+				padding-right: 0.5em;
+			}
 		</style>
 
 		<title>Test</title>
 	</head>
 	<body>
 		<div id="message"></div>
-		<canvas id="canvas" height="800" width="1000" style="margin: auto; display: block;">Wat</canvas>
+		<ul id="scores"></ul>
+		<canvas id="canvas" style="width:100%; height: 100%; display: block;">Wat</canvas>
 		<script>
 			window.requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame  || window.oRequestAnimationFrame || function(callback) {
 					window.setTimeout(function() {callback(Date.now())}, 1000 / 60.0);
@@ -28,6 +65,11 @@
 			//Get canvas stuff
 			var canvas = $('#canvas').get(0);
 			var width = canvas.width, height = canvas.height;
+
+			$(window).resize(function(){
+				width = canvas.width = $(canvas).width();
+				height = canvas.height = $(canvas).height();
+			}).resize();
 
 			// $(window).resize(function(){
 			// 	width = canvas.width = $(canvas).width();
@@ -45,17 +87,54 @@
 				right: 68
 			};
 
-			var universe = new World(1000, 800);
+			var universe = new World(2000, 2000);
 
 			
 
 			var socket = io.connect('http://42nd.org:8090');
 			var name;
+			var head;
+			var heads;
+			var viewOrigin = Vector.zero;
+			function updateTranslation() {
+				var border = 10;
+				var x = head.position.x - width / 2;
+				var y = head.position.y - height / 2;
+
+				if(x < -border)
+					x = -border;
+				else if(x > border + universe.width - width)
+					x = border + universe.width - width;
+
+				if(y < -border)
+					y = -border;
+				else if(y > border + universe.height - height)
+					y = border + universe.height - height;
+				// if(universe.width < width)
+				// 	x = (universe.width - width) / 2;
+				// else if(head.position.x + width / 2 > universe.width)
+				// 	x = universe.width - width;
+				// else if(head.position.x - width / 2 < 0)
+				// 	x = 0;
+				// else
+				// 	x = head.position.x - width / 2;
+
+				// if(universe.height < height)
+				// 	y = (universe.height - height) / 2;
+				// else if(head.position.y + height / 2 > universe.height)
+				// 	y = universe.height - height;
+				// else if(head.position.y - height / 2 < 0)
+				// 	y = 0;
+				// else
+				// 	y;
+
+				viewOrigin = new Vector(x, y);
+			}
 			(function joinTheGame(i) {
-				var n = 'bot' + i;
-				socket.emit('join', n, function(data) {
+				var n = "bot" + i;
+				socket.emit('join', n, function(data, silly) {
 					if(data) {
-						name = n;
+						localStorage['name'] = name = n;
 						startPlaying();
 					} else {
 						joinTheGame(i + 1);
@@ -78,77 +157,84 @@
 			socket.on('servermessage', function (str) {
 				$('#message').text(str);
 			});
+			socket.on('scores', function (scores) {
+				var s = $('#scores').empty();
+				scores.forEach(function(score) {
+					$('<li />').append(
+						$('<span class="name"/>').text(score[0]), " ", 
+						$('<span />').text(score[1])
+					).css('color', score[2]).appendTo(s);
+				})
+			});
 			function startPlaying() {
 				socket.on('entityupdates', function (data) {
-					for(id in data) {
+					Object.forEach(data.e, function(edata, id) {
 						if(id in universe.entities) {
-							var edata = data[id];
 							var p = Vector.ify(edata.pos);
 							var c = Color.ify(edata.color);
 							var e = universe.entities[id];
-							if(p) e.position = p;
+							e.position = p;
 							e.color = c;
 							e.radius = edata.radius;
-							e.name = edata.playername;
 							e.head = edata.head;
+							e.name = edata.playername;
 						} else {
 							//console.log("Id "+id+" not found!");
 						}
-					}
-					
-					var me = universe.entityById(id);
+					});
+					var newHeads = {};
+					Object.forEach(data.s, function(id, name) {
+						newHeads[name] = universe.entities[id];
+					});
+					head = newHeads[name];
+					heads = newHeads;
+
 					var dist = -1;
 					var closest;
 					var mass = 0;
-					for(e in universe.entities) {
-						if(e.name == me.name) {
-							mass += e.mass;
-						}
+					for(id in universe.entities) {
+						var e = universe.entities[id];
+						if(e.name == name) mass += e.mass;
 					}
-					for(e in universe.entities) {
-						if(!e.position) console.log(e.position);
-						if(e.name == me.name || e.mass > mass * 2) continue;
-						
-						var d = Math.sqrt(Math.pow(e.position.x - me.position.x, 2) + Math.pow(e.position.y - me.position.y, 2));
+					for(id in universe.entities) {
+						var e = universe.entities[id];
+						if(e.name == name || e.head || e.mass * 2 > mass) continue;
+						var d = Math.sqrt(Math.pow(e.x - head.x, 2) + Math.pow(e.y - head.y, 2));
 						if(dist == -1 || d < dist) {
 							dist = d;
 							closest = e;
 						}
 					}
-					if(closest) {
-						socket.emit('playercontrol', new Vector2(closest.position.x, closest.position.y));
-					}
-					/*else {
-						socket.emit('playercontrol', me.position);
-					}*/
-				});
-
-				var target = new Vector();
-				/*$(document).mousemove(function(e) {
-					var offset = $(canvas).offset();
-					var x = e.pageX - offset.left;
-					var y = e.pageY - offset.top;
-					target.set(x, y);
+					target = closest ? closest.position : head.position;
 					socket.emit('playercontrol', target);
-				});*/
+				});
 
 				var lastt = Date.now();
 				function draw(t) {
 					//Calculate frame time
 					var dt = (t - lastt) / 1000.0;
+					ctx.clearRect(0, 0, width, height);
+					ctx.save();
+					if(head) {
+						updateTranslation();
+						ctx.translate(-viewOrigin.x, -viewOrigin.y);
+						ctx.globalCompositeOperation = "source-over";
+						ctx.fillStyle = "black";
+						ctx.fillRect(0, 0, 2000, 2000);
 
-					ctx.globalCompositeOperation = "source-over";
-					ctx.fillStyle = "black";
-					ctx.fillRect(0, 0, width, height);
-
-					universe.entities.forEach(function(e) {
-						e.drawTo(ctx);
+						universe.entities.forEach(function(e) {
+							e.drawTo(ctx);
+						});
 						ctx.fillStyle = "white";
-						if(e.head) ctx.fillText(e.name, e.position.x, e.position.y);
-					});
-
+						Object.forEach(heads, function(h) {
+							ctx.beginPath();
+							ctx.arc(h.position.x, h.position.y, h.radius / 2, 0, Math.PI * 2, false);
+							ctx.fill();
+						});
+					}
 					//prepare for next frame
 					lastt = t;
+					ctx.restore();
 					requestAnimationFrame(draw);
 				}
 				requestAnimationFrame(draw);
