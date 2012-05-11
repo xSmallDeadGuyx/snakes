@@ -48,13 +48,24 @@
 				text-align: right;
 				padding-right: 0.5em;
 			}
+
+			#info {
+				position: absolute;
+				top: 5px;
+				left: 0px;
+				color: white;
+				list-style: none;
+			}
 		</style>
 
-		<title>Test</title>
+		<title>SDG Snake Bot</title>
 	</head>
 	<body>
 		<div id="message"></div>
 		<ul id="scores"></ul>
+		<ul id="info">
+			<li>Bot info</li>
+		</ul>
 		<canvas id="canvas" style="width:100%; height: 100%; display: block;">Wat</canvas>
 		<script>
 			window.requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame  || window.oRequestAnimationFrame || function(callback) {
@@ -96,6 +107,16 @@
 			var head;
 			var heads;
 			var viewOrigin = Vector.zero;
+			
+			var lastPos;
+			var target;
+
+			var velocity;
+			var debugData = {"Bot info": ""};
+
+			var vBias = 0.3;
+			var mBias = 0.1;
+
 			function updateTranslation() {
 				var border = 10;
 				var x = head.position.x - width / 2;
@@ -131,7 +152,7 @@
 				viewOrigin = new Vector(x, y);
 			}
 			(function joinTheGame(i) {
-				var n = "bot" + i;
+				var n = "ag-bot" + i;
 				socket.emit('join', n, function(data, silly) {
 					if(data) {
 						localStorage['name'] = name = n;
@@ -141,6 +162,14 @@
 					}
 				});
 			})(0);
+
+			function refreshDebugData() {
+				var string = "";
+				for(x in debugData) {
+					string += "<li>" + x + ": " + debugData[x] + "</li>\n";
+				}
+				$('#info').html(string);
+			}
 
 			socket.on('entityadded', function (data) {
 				var b = new Ball(
@@ -166,18 +195,44 @@
 					).css('color', score[2]).appendTo(s);
 				})
 			});
+
+			function costToMoveTo(e) {
+				var distance = head.position.distanceTo(e.position);
+				var velocityBias = head.velocity.plus(head.position).distanceTo(e.position) * vBias;
+				var massBias = e.mass * mBias;
+				return distance + velocityBias - massBias;
+			}
+
+			function chooseNewTarget() {
+				var cost = -1;
+				var lowest;
+				for(id in universe.entities) {
+					var e = universe.entities[id];
+					if(!e.position || e.name == name || e.head || e.mass >= head.mass * 2) continue;
+					var c = costToMoveTo(e);
+					if(cost == -1 || c < cost) {
+						cost = c;
+						lowest = e;
+					}
+				}
+				if(lowest) target = lowest;
+			}
+
 			function startPlaying() {
 				socket.on('entityupdates', function (data) {
+					var me = {};
 					Object.forEach(data.e, function(edata, id) {
 						if(id in universe.entities) {
 							var p = Vector.ify(edata.pos);
 							var c = Color.ify(edata.color);
 							var e = universe.entities[id];
 							e.position = p;
+							if(!p) alert(edata.pos);
 							e.color = c;
 							e.radius = edata.radius;
 							e.head = edata.head;
 							e.name = edata.playername;
+							if(e.name == name) me += e;
 						} else {
 							//console.log("Id "+id+" not found!");
 						}
@@ -189,24 +244,15 @@
 					head = newHeads[name];
 					heads = newHeads;
 
-					var dist = -1;
-					var closest;
-					var mass = 0;
-					for(id in universe.entities) {
-						var e = universe.entities[id];
-						if(e.name == name) mass += e.mass;
-					}
-					for(id in universe.entities) {
-						var e = universe.entities[id];
-						if(e.name == name || e.head || e.mass * 2 > mass) continue;
-						var d = Math.sqrt(Math.pow(e.x - head.x, 2) + Math.pow(e.y - head.y, 2));
-						if(dist == -1 || d < dist) {
-							dist = d;
-							closest = e;
-						}
-					}
-					target = closest ? closest.position : head.position;
-					socket.emit('playercontrol', target);
+					chooseNewTarget();
+
+					velocity = lastPos ? head.position.minus(lastPos) : Vector.zero;
+					debugData['velocity'] = Math.round(velocity.x * 100) / 100 + ", " + Math.round(velocity.y * 100) / 100;
+					debugData['position'] = Math.round(head.position.x * 100) / 100 + ", " + Math.round(head.position.y * 100) / 100;
+
+					socket.emit('playercontrol', target ? target.position : head.position);
+					lastPos = head.position;
+					refreshDebugData();
 				});
 
 				var lastt = Date.now();
