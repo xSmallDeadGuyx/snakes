@@ -1,7 +1,7 @@
 <!doctype html>
 <html>
 	<head>
-		<script src="/socket.io/socket.io.js"></script>
+		<script src="http://42nd.org:8090/socket.io/socket.io.js"></script>
 		<script src="util.js"></script>
 		<script src="vector.js"></script>
 		<script src="entity.js"></script>
@@ -51,18 +51,17 @@
 
 			var socket = io.connect('http://42nd.org:8090');
 			var name;
-			(function joinTheGame() {
-				var n = prompt('name?');
+			(function joinTheGame(i) {
+				var n = 'bot' + i;
 				socket.emit('join', n, function(data) {
 					if(data) {
 						name = n;
 						startPlaying();
 					} else {
-						alert("Name taken!")
-						joinTheGame();
+						joinTheGame(i + 1);
 					}
 				});
-			})();
+			})(0);
 
 			socket.on('entityadded', function (data) {
 				var b = new Ball(
@@ -87,23 +86,51 @@
 							var p = Vector.ify(edata.pos);
 							var c = Color.ify(edata.color);
 							var e = universe.entities[id];
-							e.position = p;
+							if(p) e.position = p;
 							e.color = c;
-							e.radius = edata.radius
+							e.radius = edata.radius;
+							e.name = edata.playername;
+							e.head = edata.head;
 						} else {
 							//console.log("Id "+id+" not found!");
 						}
 					}
+					
+					var me = universe.entityById(id);
+					var dist = -1;
+					var closest;
+					var mass = 0;
+					for(e in universe.entities) {
+						if(e.name == me.name) {
+							mass += e.mass;
+						}
+					}
+					for(e in universe.entities) {
+						if(!e.position) console.log(e.position);
+						if(e.name == me.name || e.mass > mass * 2) continue;
+						
+						var d = Math.sqrt(Math.pow(e.position.x - me.position.x, 2) + Math.pow(e.position.y - me.position.y, 2));
+						if(dist == -1 || d < dist) {
+							dist = d;
+							closest = e;
+						}
+					}
+					if(closest) {
+						socket.emit('playercontrol', new Vector2(closest.position.x, closest.position.y));
+					}
+					/*else {
+						socket.emit('playercontrol', me.position);
+					}*/
 				});
 
 				var target = new Vector();
-				$(document).mousemove(function(e) {
+				/*$(document).mousemove(function(e) {
 					var offset = $(canvas).offset();
 					var x = e.pageX - offset.left;
 					var y = e.pageY - offset.top;
 					target.set(x, y);
 					socket.emit('playercontrol', target);
-				});
+				});*/
 
 				var lastt = Date.now();
 				function draw(t) {
@@ -116,6 +143,8 @@
 
 					universe.entities.forEach(function(e) {
 						e.drawTo(ctx);
+						ctx.fillStyle = "white";
+						if(e.head) ctx.fillText(e.name, e.position.x, e.position.y);
 					});
 
 					//prepare for next frame

@@ -2,7 +2,7 @@ Ball = function Ball(pos, radius, color) {
 	Entity.call(this, pos)
 	this.radius = radius;
 	this.color = color || 'red';
-
+	
 	this.forces.contact = {};
 	Object.defineEvent(this, 'onInteracted', true);
 }
