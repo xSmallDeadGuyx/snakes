@@ -9,9 +9,7 @@ Player = function Player(socket, name, snake) {
 	var $this = this;
 
 	socket.on('playercontrol', function(target) {
-		console.log("Test!", target);
 		if($this.connected) {
-			console.log("!!!");
 			target = Vector.ify(target);
 			if(target)
 				$this.snake.target = target;
