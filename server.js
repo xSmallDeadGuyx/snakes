@@ -15,7 +15,7 @@ require('./player');
 
 
 var app = express.createServer();
-app.listen(8090);
+app.listen(+process.argv[2] || 8090);
 app.use(express.static(__dirname, {maxAge: 60000}));
 app.use(express.errorHandler());
 app.get('/', function (req, res) {
@@ -27,23 +27,25 @@ app.get('/local', function (req, res) {
 
 io = socketio.listen(app);
 io.set('log level', 2);
-io.sockets.on('connection', function (socket) {
-	Player.listenFor(socket, function playerJoined() {
-		if(Object.keys(players).length == 1)
-			generateBalls(50);
-		console.log("Player joined", this);
+io.sockets.on('connection', Player.listener(function() {
+	console.log("Player "+this.name+" joined");
+	if(Object.keys(players).length == 1) {
+		generateBalls(50);
+		console.log("Balls placed");
+	}
 
-		players[this.name] = this;
+	players[this.name] = this;
 
-		this.onQuit.stuff = function() {
-			delete players[this.name];
-			//Clear the world if the player is last to leave
-			if(Object.isEmpty(players)) {
-				universe.clear();
-			}
+	this.onQuit.stuff = function() {
+		delete players[this.name];
+		console.log("Player "+this.name+" quit");
+		//Clear the world if the player is last to leave
+		if(Object.isEmpty(players)) {
+			universe.clear();
+			console.log("Universe cleared");
 		}
-	});
-});
+	}
+}));
 
 
 universe.onEntityRemoved.updateClients = function(e) {
@@ -51,9 +53,9 @@ universe.onEntityRemoved.updateClients = function(e) {
 }
 universe.onEntityAdded.updateClients = function(e) {
 	io.sockets.emit('entityadded', {
-		p: e.position,
+		p: e.position.toFixed(2),
 		r: e.radius,
-		c: e.color,
+		c: e.color.toInt(),
 		i: e._id
 	});
 }
@@ -63,12 +65,12 @@ updateClients = function() {
 	data.s = {};
 	universe.entities.forEach(function(e) {
 		var entityUpdate = {};
-		entityUpdate.pos = e.position;
-		entityUpdate.color = e.color;
-		entityUpdate.radius = e.radius;
+		entityUpdate.p = e.position.toFixed(2);
+		entityUpdate.c = e.color.toInt();
+		entityUpdate.r = e.radius;
 		if(e.ownerSnake && e.ownerSnake.name) {
-			entityUpdate.playername = e.ownerSnake.name;
-			if(e == e.ownerSnake.head) entityUpdate.head = true;
+			entityUpdate.n = e.ownerSnake.name;
+			if(e == e.ownerSnake.head) entityUpdate.h = true;
 		}
 
 		data.e[e._id] = entityUpdate;
@@ -160,7 +162,8 @@ stdin.on('data', function(chunk) {
 	} else if(matches = /^\s*balls (\d+)/.exec(chunk)) {
 		generateBalls(+matches[1]);
 	} else if(matches = /^\s*kick (.+)/.exec(chunk)) {
-		delete player[matches[1]];
+		var player = players[matches[1]]
+		player && player.disconnect();
 	} else {
 		console.log("sending message");
 		io.sockets.emit('servermessage', ""+chunk);

@@ -40,6 +40,18 @@ Color.prototype.randomized = function(x)       { return this.clone().randomize(x
 Color.prototype.toString = function() {
 	return 'rgb(' + Math.round(this.r) + ', ' + Math.round(this.g) + ', ' + Math.round(this.b) + ')';
 };
+Color.prototype.toHexString = function() {
+	return '#' + this.toInt().toString(16);
+};
+Color.prototype.toInt = function(rgb) {
+	return Math.round(this.r) << 16 | Math.round(this.g) << 8 | Math.round(this.b);
+}
+Color.fromInt = function(rgb) {
+	var b = rgb & 0xff;
+	var g = (rgb >>= 8) & 0xff;
+	var r = (rgb >>= 8) & 0xff;
+	return new Color(r, g, b);
+}
 Color.prototype.clone = function() {
 	var c = new Color;
 	c.r = this.r, c.b = this.b, c.g = this.g
@@ -52,7 +64,27 @@ Color.clipComponent = function(x) {
 	return x > 255 ? 255 : x < 0 ? 0 : x;
 }
 Color.ify = function(data) {
-	return new Color(data.r, data.g, data.b);
+	if(typeof data == "number")
+		return Color.fromInt(data);
+	else if(data instanceof Object)
+		return new Color(data.r, data.g, data.b);
+}
+Color.randomHue = function() {
+	var a = Math.random() * 6;
+	var b = Math.random() * 128 - 64;
+
+	if(a < 1)
+		return new Color(255, 64 + b, 64 - b); //yellow-magenta face
+	else if(a < 2)
+		return new Color(64 - b, 255, 64 + b); //magenta-cyan face
+	else if(a < 3)
+		return new Color(64 + b, 64 - b, 255); //cyan-yellow face
+	else if(a < 4)
+		return new Color(0, 192 + b, 192 - b); //green-blue face
+	else if(a < 5)
+		return new Color(192 - b, 0, 192 + b); //blue-red face
+	else
+		return new Color(192 + b, 192 - b, 0); //red-green face
 }
 
 //Primaries
