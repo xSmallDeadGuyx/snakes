@@ -1,14 +1,14 @@
 <!doctype html>
 <html>
 	<head>
-		<script src="http://42nd.org:8090/socket.io/socket.io.js"></script>
+		<script src="socket.io.js"></script>
 		<script src="util.js"></script>
 		<script src="vector.js"></script>
 		<script src="entity.js"></script>
 		<script src="color.js"></script>
 		<script src="ball.js"></script>
 		<script src="world.js"></script>
-		<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Dosis:300,700" />
+		<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Dosis:300,600|Ubuntu" />
 		<meta property="og:title" content="Snakes - a game written in Javascript and HTML5 canvas"/>
 		<meta property="og:type" content="website"/>
 		<meta property="og:url" content="http://42nd.org:8090/"/>
@@ -65,18 +65,19 @@
 				top: 50%;
 				margin: 0px;
 				padding: 1px;
-				list-style: none;
 				background-color: black;
 			}
 			#infolist {
-				width: 100%;
-				height: 100%;
-				padding: 5px;
+				padding: 2em;
 				display: block;
-				border: 1px solid white;
+				list-style: none;
+				overflow-y: scroll;
 			}
 
 			#canvas {
+				position: absolute;
+				top: 0px;
+				left: 0px;
 				width: 50%;
 				height: 50%;
 				display: block;
@@ -84,25 +85,58 @@
 				padding: 0px;
 				float: left;
 			}
+
+			h2 {
+				color: #ff8000;
+				line-height: 30px;
+				font-size: 24px;
+				padding: 5px;
+				margin: 0;
+			}
+			p {
+				margin: 0;
+				padding: 5px;
+				font-family: Ubuntu;
+			}
+			a {
+				color: #ff8000;
+				border-bottom: 1px dotted #ff8000;
+				text-decoration: none;
+			}
 			#map {
+				position: absolute;
+				top: 0px;
+				left: 50%;
 				width: 50%;
 				height: 50%;
 				display: block;
 				margin: 0px;
 				padding: 0px;
-				float: right;
 			}
 
 			.score-bar {
+				position: absolute;
 				width: 50%;
+				left: 50%;
+				top:50%;
 				height: 10px;
 				background: #808080;
 			}
 			.score-bar div {
+				position: absolute;
 				height: 10px;
 			}
+			
+			#controls {
+				position: absolute;
+				top: 50%;
+				margin: 0px;
+				margin-top: 10px;
+				left: 50%;
+				padding: 2em;
+				color: white;
+			}
 		</style>
-
 		<title>SDG Snake Bot</title>
 	</head>
 	<body>
@@ -122,16 +156,16 @@
 			<div></div>
 		</div>
 		<ul id="scores"></ul>
+		<div id="controls">
+			Bot Name: <input type="text" id="name" value="sdg-bot" /><br />
+			Server: <input type="text" id="server" value="http://42nd.org:8090" /><br />
+			<input type="submit" onclick="begin()" />
+		</div>
 		<script>
 			var color = Color.randomHue();
-			$('#login .box').css({
-				borderTopColor: color.toHexString(),
-				borderBottomColor: color.toHexString(),
-			});
-
 			window.requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame  || window.oRequestAnimationFrame || function(callback) {
-					window.setTimeout(function() {callback(Date.now())}, 1000 / 60.0);
-				};
+				window.setTimeout(function() {callback(Date.now())}, 1000 / 60.0);
+			};
 
 
 			//Get canvas stuff
@@ -164,9 +198,9 @@
 
 			var universe = new World(2000, 2000);
 
-			var prefix = "sdgbot-";
+			var prefix = "sdg-bot";
 
-			var socket = io.connect('http://42nd.org:8090');
+			var socket;
 			var name;
 			var head;
 			var heads;
@@ -180,6 +214,69 @@
 
 			var vBias = 0.3;
 			var mBias = 0.1;
+
+			function begin() {
+				prefix = $('#name').val();
+				socket = io.connect($('#server').val());
+
+				socket.on('entityadded', function (data) {
+					if(data.i in universe.entities) return;
+
+					var b = new Ball(
+						Vector.ify(data.p),
+						data.r,
+						Color.ify(data.c)
+					);
+					b._id = data.i; //probably going to regret this
+					universe.addEntity(b);
+				});
+				socket.on('entitylost', function (id) {
+					delete universe.entities[id];
+				});
+				socket.on('servermessage', function (str) {
+					$('#message').text(str);
+				});
+				socket.on('scores', function (scores) {
+
+					//Get the DOM elements
+					var scoreList = $('#scores').empty();
+					var scoreBar = $('.score-bar').empty();
+
+					//Keep track of left and rightmost bars
+					var mostLeft = 0;
+					var mostRight = 0;
+
+					scores.forEach(function(score, i) {
+						score = { name: score[0], value: score[1], color: score[2] };
+						//Add names to scoreboard
+						$('<li />').append(
+							$('<span class="name"/>').text(score.name), " ", 
+							$('<span />').text(score.value)
+						).css('color', score.color).appendTo(scoreList);
+
+						//Pad out the bar, alternating sides
+						if(i%2 == 0) {
+							//left
+							$('<div />').css({
+								backgroundColor: score.color,
+								width: (score.value / 10) + '%',
+								left:  (mostLeft    / 10) + '%'
+							}).appendTo(scoreBar);
+							mostLeft += score.value;
+						}
+						else {
+							//right
+							$('<div />').css({
+								backgroundColor: score.color,
+								width: (score.value / 10) + '%',
+								right: (mostRight   / 10) + '%'
+							}).appendTo(scoreBar);
+							mostRight += score.value;
+						}
+					});
+				});
+				joinTheGame(1);
+			}
 
 			function updateTranslation() {
 				var x, y
@@ -208,8 +305,8 @@
 				viewOrigin = new Vector(x, y);
 			}
 
-			(function joinTheGame(i) {
-				var n = prefix + i;
+			function joinTheGame(i) {
+				var n = prefix + (i > 1 ? i : '');
 				socket.emit('join', {name: n, color: color.toInt()}, function(data, silly) {
 					if(data) {
 						localStorage['name'] = name = n;
@@ -218,7 +315,7 @@
 						joinTheGame(i + 1);
 					}
 				});
-			})(0);
+			};
 
 			function refreshDebugData() {
 				var string = "";
@@ -227,63 +324,6 @@
 				}
 				$('#info').html(string);
 			}
-
-			socket.on('entityadded', function (data) {
-				if(data.i in universe.entities) return;
-
-				var b = new Ball(
-					Vector.ify(data.p),
-					data.r,
-					Color.ify(data.c)
-				);
-				b._id = data.i; //probably going to regret this
-				universe.addEntity(b);
-			});
-			socket.on('entitylost', function (id) {
-				delete universe.entities[id];
-			});
-			socket.on('servermessage', function (str) {
-				$('#message').text(str);
-			});
-			socket.on('scores', function (scores) {
-
-				//Get the DOM elements
-				var scoreList = $('#scores').empty();
-				var scoreBar = $('.score-bar').empty();
-
-				//Keep track of left and rightmost bars
-				var mostLeft = 0;
-				var mostRight = 0;
-
-				scores.forEach(function(score, i) {
-					score = { name: score[0], value: score[1], color: score[2] };
-					//Add names to scoreboard
-					$('<li />').append(
-						$('<span class="name"/>').text(score.name), " ", 
-						$('<span />').text(score.value)
-					).css('color', score.color).appendTo(scoreList);
-
-					//Pad out the bar, alternating sides
-					if(i%2 == 0) {
-						//left
-						$('<div />').css({
-							backgroundColor: score.color,
-							width: (score.value / 10) + '%',
-							left:  (mostLeft    / 10) + '%'
-						}).appendTo(scoreBar);
-						mostLeft += score.value;
-					}
-					else {
-						//right
-						$('<div />').css({
-							backgroundColor: score.color,
-							width: (score.value / 10) + '%',
-							right: (mostRight   / 10) + '%'
-						}).appendTo(scoreBar);
-						mostRight += score.value;
-					}
-				});
-			});
 
 			function canEat(e) {
 				if(e.name == name || e.head || e.mass >= head.mass * 2) return false;
@@ -366,62 +406,62 @@
 			};
 
 			var lastt = Date.now();
-				function draw(t) {
-					//Calculate frame time
-					var dt = (t - lastt) / 1000.0;
-					ctx.clearRect(0, 0, width, height);
-					ctx.fillStyle = "black";
-					ctx.fillRect(0, 0, width, height);
-					ctx.save();
+			function draw(t) {
+				//Calculate frame time
+				var dt = (t - lastt) / 1000.0;
+				ctx.clearRect(0, 0, width, height);
+				ctx.fillStyle = "black";
+				ctx.fillRect(0, 0, width, height);
+				ctx.save();
 
-					updateTranslation();
-					ctx.translate(-viewOrigin.x, -viewOrigin.y);
-					ctx.globalCompositeOperation = "source-over";
+				updateTranslation();
+				ctx.translate(-viewOrigin.x, -viewOrigin.y);
+				ctx.globalCompositeOperation = "source-over";
 
-					ctx.globalCompositeOperation = "lighter";
+				ctx.globalCompositeOperation = "lighter";
+				universe.entities.forEach(function(e) {
+					e.drawTo(ctx);
+				});
+				ctx.fillStyle = "white";
+				Object.forEach(heads, function(h) {
+					ctx.beginPath();
+					ctx.arc(h.position.x, h.position.y, h.radius / 2, 0, Math.PI * 2, false);
+					ctx.fill();
+				});
+
+				//prepare for next frame
+				ctx.restore();
+				ctx.strokeStyle = "blue";
+				ctx.strokeRect(0, 0, width, height);
+
+				mtx.clearRect(0, 0, mwidth, mheight);
+				mtx.fillStyle = "black";
+				mtx.fillRect(0, 0, mwidth, mheight);
+				mtx.save();
+				if(head) {
+					var minScale = Math.min(mwidth / 2000, mheight / 2000);
+					mtx.translate(mwidth / 2 - minScale * 1000, mheight / 2 - minScale * 1000);
+					mtx.scale(minScale, minScale);
+					mtx.globalCompositeOperation = "source-over";
+
 					universe.entities.forEach(function(e) {
-						e.drawTo(ctx);
+						e.drawTo(mtx);
 					});
-					ctx.fillStyle = "white";
+					mtx.fillStyle = "white";
 					Object.forEach(heads, function(h) {
-						ctx.beginPath();
-						ctx.arc(h.position.x, h.position.y, h.radius / 2, 0, Math.PI * 2, false);
-						ctx.fill();
+						mtx.beginPath();
+						mtx.arc(h.position.x, h.position.y, h.radius / 2, 0, Math.PI * 2, false);
+						mtx.fill();
 					});
-
-					//prepare for next frame
-					ctx.restore();
-					ctx.strokeStyle = "blue";
-					ctx.strokeRect(0, 0, width, height);
-
-					mtx.clearRect(0, 0, mwidth, mheight);
-					mtx.fillStyle = "black";
-					mtx.fillRect(0, 0, mwidth, mheight);
-					mtx.save();
-					if(head) {
-						var minScale = Math.min(mwidth / 2000, mheight / 2000);
-						mtx.translate(mwidth / 2 - minScale * 1000, mheight / 2 - minScale * 1000);
-						mtx.scale(minScale, minScale);
-						mtx.globalCompositeOperation = "source-over";
-
-						universe.entities.forEach(function(e) {
-							e.drawTo(mtx);
-						});
-						mtx.fillStyle = "white";
-						Object.forEach(heads, function(h) {
-							mtx.beginPath();
-							mtx.arc(h.position.x, h.position.y, h.radius / 2, 0, Math.PI * 2, false);
-							mtx.fill();
-						});
-					}
-					mtx.restore();
-					mtx.strokeStyle = "orange";
-					mtx.strokeRect(0, 0, mwidth, mheight);
-
-					lastt = t;
-					requestAnimationFrame(draw);
 				}
+				mtx.restore();
+				mtx.strokeStyle = "orange";
+				mtx.strokeRect(0, 0, mwidth, mheight);
+
+				lastt = t;
 				requestAnimationFrame(draw);
+			}
+			requestAnimationFrame(draw);
 		</script>
 	</body>
 </html>
