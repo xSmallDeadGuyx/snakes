@@ -1,14 +1,16 @@
 <!doctype html>
-<html>
+<html xmlns:og="http://opengraphprotocol.org/schema/">
 	<head>
 		<script src="socket.io.js"></script>
 		<script src="util.js"></script>
+		<script src="jquery.placeholder.js"></script>
 		<script src="vector.js"></script>
 		<script src="entity.js"></script>
 		<script src="color.js"></script>
 		<script src="ball.js"></script>
 		<script src="world.js"></script>
 		<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Dosis:300,600|Ubuntu" />
+
 		<meta property="og:title" content="SDG Snake Bot"/>
 		<meta property="og:type" content="website"/>
 		<meta property="og:url" content="http://smalldeadguy.tk/"/>
@@ -244,8 +246,8 @@
 					<p>A bot for the game "Snakes" by <a href="http://eric-wieser.tk/">Eric Wieser</a>. Just sit back, relax, and watch the bot go! Far from perfect but progress is being made</p>
 					<p id="input">
 						<a href="#" id="about-link">About</a><br /><br />
-						Name: <input id="name" placeholder="Enter your name here" autocomplete="off" value="sdg-bot"/><br/>
-						Server: <input id="server" placeholder="Enter server here" autocomplete="off" value="http://42nd.org:8090" />
+						Name: <input id="name" placeholder="Enter your name here" autocomplete="off" value="sdg-bot" /><br/>
+						Server: <input id="server" placeholder="Enter server here" autocomplete="off" value="http://42nd.org:8090"  autofocus="autofocus" />
 					</p>
 					<div style="text-align: center"><button href="#" class="button" onclick="begin()">Join the game</a></div>
 				</div>
