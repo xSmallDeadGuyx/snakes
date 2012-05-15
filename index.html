@@ -604,6 +604,9 @@
 							universe.addEntity(b);
 						}	
 					});
+					for(id in universe.entities)
+						if(!(id in data.e))
+							delete universe.entities[id];
 					var newHeads = {};
 					Object.forEach(data.s, function(id, name) {
 						newHeads[name] = universe.entities[id];
