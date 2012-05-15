@@ -3,7 +3,6 @@
 	<head>
 		<script src="socket.io.js"></script>
 		<script src="util.js"></script>
-		<script src="jquery.placeholder.js"></script>
 		<script src="vector.js"></script>
 		<script src="entity.js"></script>
 		<script src="color.js"></script>
@@ -32,6 +31,7 @@
 				font-size: 30px;
 				text-align: center;
 			}
+
 			#scores {
 				position: absolute;
 				bottom: 5px;
@@ -99,6 +99,15 @@
 				margin: 0;
 				padding: 5px;
 				font-family: Ubuntu;
+				line-height: 20px;
+			}
+			small {
+				padding: 5px;
+				font-family: Ubuntu;
+				color: #808080;
+				width: 100%;
+				text-align: center;
+				display: block;
 			}
 			a {
 				color: #ff8000;
@@ -156,7 +165,7 @@
 				outline: none;
 				background-color: transparent;
 			}
-			#input {
+			#loginform {
 				font-size: 20px;
 			}
 		
@@ -196,6 +205,50 @@
 
 			#about .box {
 				width: 80%;
+			}
+
+			#chat {
+				position: absolute;
+				bottom: 0px;
+			}
+			#chat input {
+				height: 20px;
+				color: white;
+				padding: 0px;
+				margin: 0;
+				border: 0;
+				display: block;
+				width: 100%;
+				box-sizing: border-box;
+				background: transparent;
+				outline: none;
+			}
+
+			#chat .history {
+				color: white;
+				margin: 0;
+				padding: 0;
+				position: absolute;
+				bottom: 20px;
+			}
+			#chat .history li {
+				color: white;
+				padding: 0;
+				margin: 0;
+				word-wrap: break-word;
+				width: 100%;
+			}
+			#wrapper {
+				position: absolute;
+				top: 10px;
+				left: 0;
+				right: 0;
+				bottom: 0;
+			}
+			canvas {
+				width: 100%;
+				height: 100%;
+				display: block;
 			}
 
 			.vertical-center {
@@ -239,17 +292,25 @@
 			<div></div>
 		</div>
 		<ul id="scores"></ul>
+
+		<form id="chat">
+			<ul class="history">
+			</ul>
+			<input />
+			<button type="submit" style="display: none"></button>
+		</form>
+
 		<div id="login" class="vertical-center">
 			<div>
 				<div class="box">
 					<h1>Snakes</h2>
 					<p>A bot for the game "Snakes" by <a href="http://eric-wieser.tk/">Eric Wieser</a>. Just sit back, relax, and watch the bot go! Far from perfect but progress is being made</p>
-					<p id="input">
-						<a href="#" id="about-link">About</a><br /><br />
+					<a href="#" id="about-link">About</a><br /><br />
+					<form id="loginform">
 						Name: <input id="name" placeholder="Enter your name here" autocomplete="off" value="sdg-bot" /><br/>
 						Server: <input id="server" placeholder="Enter server here" autocomplete="off" value="http://42nd.org:8090"  autofocus="autofocus" />
-					</p>
-					<div style="text-align: center"><button href="#" class="button" onclick="begin()">Join the game</a></div>
+						<div style="text-align: center"><button type="submit" class="button">Join the game</button></div>
+					</form>
 				</div>
 			</div>
 		</div>
@@ -261,6 +322,7 @@
 
 					<h2>Networking</h2>
 					<p>Snakes needed improving. The controls were terrible, the arena too small, and most keyboards couldn't cope with the strain of 4 users each hammering arrow keys. It needed to go networked. Node.js was the answer, along with Socket.IO. This was an exercise in learning new technologies, and seeing where they led to. </p>
+
 					<h2>Created by <a href="http://eric-wieser.tk/">Eric Wieser</a>, bot by <a href="http://smalldeadguy.tk/">Alex Gilday</a></h2>
 					<p>With thanks to Max Sinclair for allowing a core of his webserver to be devoted to Snakes, Luke Suess and Jonathan Laver for game inspiration along the way, and numerous friends for playing, testing, and hacking the game so that I could improve it.</p>
 					<p>The inspiration to go networked came from Rob Hawkes' <a href="http://rawkets.com">Rawkets</a></p>
@@ -285,15 +347,12 @@
 			});
 			//Show and hide the about box
 			$('#about-link').click(function() {
-				$('#login').fadeOut(function(){
-					$('#about').fadeIn(function() {
-						$('#about').one('click', function() {
-							$('#about').fadeOut(function(){
-								$('#login').fadeIn();
-							});
-						});
-					});
-				});
+				$('#login')
+					.fadeOut()
+					.queue(function(next) { $('#about').fadeIn(next);       })
+					.queue(function(next) { $('#about').one('click', next); })
+					.queue(function(next) { $('#about').fadeOut(next);      })
+					.fadeIn();
 				return false;
 			})
 
@@ -347,7 +406,9 @@
 			var debugData = {"Bot info": ""};
 
 			var vBias = 0.3;
-			var mBias = 0.1;
+			var hBias = 100;
+
+			$('#loginform').submit(begin);
 
 			function begin() {
 				prefix = $('#name').val();
@@ -411,10 +472,25 @@
 						}
 					});
 				});
+				socket.on('chat', function (data) {
+					var name = data.n;
+					var color = Color.ify(data.c);
+					var message = data.m;
+					var history = $('#chat .history');
+					//alert(name + ":" + message);
+					$('<li />').append(
+						$('<span />').css('color', color+"").text(name),
+						' '+message
+					).appendTo('#chat .history');
+
+					while(history.children().size() > 10)
+						history.children().first().remove();
+				});
 				joinTheGame(1);
+				return false;
 			}
 
-			function updateTranslation() {
+			function nextViewOrigin() {
 				var x, y
 				if(!head) {
 					x = (universe.width - width) / 2;
@@ -438,7 +514,7 @@
 					if(universe.height + 2 * border < height)
 						y = (universe.height - height) / 2;
 				}
-				viewOrigin = new Vector(x, y);
+				return new Vector(x, y);
 			}
 
 			function joinTheGame(i) {
@@ -462,7 +538,16 @@
 			}
 
 			function canEat(e) {
-				if(e.name == name || e.head || e.mass >= head.mass * 2) return false;
+				if(e.name == name || e.mass >= head.mass * 2) return false;
+				if(e.head) {
+					for(id in universe.entities) {
+						var e2 = universe.entities[id];
+						if(e2.name == e.name && e2 != e) {
+							return false;
+						}
+					}
+					return e.mass * 2 < head.mass;
+				}
 				return true;
 			}
 
@@ -478,9 +563,9 @@
 			function costToMoveTo(e) {
 				var distance = head.position.distanceTo(e.position);
 				var velocityBias = head.velocity.plus(head.position).distanceTo(e.position) * vBias;
-				var massBias = (largestEatableMass() - e.mass) * mBias;
-				var total = distance + velocityBias + massBias;
-				return distance + velocityBias + massBias;
+				var headBias = e.head ? 0 : hBias;
+				var total = distance + velocityBias + headBias;
+				return total;
 			}
 
 			function chooseNewTarget() {
@@ -541,6 +626,24 @@
 				});
 			};
 
+			$('#chat').submit(function() {
+				var input = $(this).find('input');
+				var msg = input.val();
+				input.val('');
+				socket.emit('chat', msg);
+				return false;
+			});
+
+			function drawArrow(x, y, angle) {
+				ctx.save();
+				ctx.translate(x, y);
+				ctx.rotate(angle);
+				ctx.beginPath();
+				ctx.moveTo(5, 0);
+				ctx.lineTo(20,-7.5);
+				ctx.lineTo(20, 7.5);
+				ctx.restore();
+			}
 			var lastt = Date.now();
 			function draw(t) {
 				//Calculate frame time
@@ -549,8 +652,8 @@
 				ctx.fillStyle = "black";
 				ctx.fillRect(0, 0, width, height);
 				ctx.save();
+				viewOrigin = nextViewOrigin();
 
-				updateTranslation();
 				ctx.translate(-viewOrigin.x, -viewOrigin.y);
 				ctx.globalCompositeOperation = "source-over";
 
@@ -558,11 +661,29 @@
 				universe.entities.forEach(function(e) {
 					e.drawTo(ctx);
 				});
-				ctx.fillStyle = "white";
 				Object.forEach(heads, function(h) {
-					ctx.beginPath();
-					ctx.arc(h.position.x, h.position.y, h.radius / 2, 0, Math.PI * 2, false);
-					ctx.fill();
+					if(h.position.x + h.radius < viewOrigin.x) {
+						drawArrow(viewOrigin.x, h.position.y, 0);
+						ctx.fillStyle = h.color+"";
+						ctx.fill();
+					} else if(h.position.x - h.radius > viewOrigin.x + width) {
+						drawArrow(viewOrigin.x + width, h.position.y, Math.PI);
+						ctx.fillStyle = h.color+"";
+						ctx.fill();
+					} else if(h.position.y + h.radius < viewOrigin.y) {
+						drawArrow(h.position.x, viewOrigin.y,  Math.PI / 2);
+						ctx.fillStyle = h.color+"";
+						ctx.fill();
+					} else if(h.position.y - h.radius > viewOrigin.y + height) {
+						drawArrow(h.position.x, viewOrigin.y + height, 3 * Math.PI / 2);
+						ctx.fillStyle = h.color+"";
+						ctx.fill();
+					} else {
+						ctx.beginPath();
+						ctx.arc(h.position.x, h.position.y, h.radius / 2, 0, Math.PI * 2, false);
+						ctx.fillStyle = "white";
+						ctx.fill();
+					}
 				});
 
 				//prepare for next frame
