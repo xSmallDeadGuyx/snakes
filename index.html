@@ -25,7 +25,7 @@
 			#message {
 				color: white;
 				position: absolute;
-				top:10px;
+				top: 10px;
 				left: 0;
 				right: 0;
 				font-size: 30px;
@@ -58,30 +58,12 @@
 				padding-right: 0.5em;
 			}
 
-			#info {
-				position: absolute;
-				width: 50%;
-				height: 50%;
-				display: block;
-				color: white;
-				top: 50%;
-				margin: 0px;
-				padding: 1px;
-				background-color: black;
-			}
-			#infolist {
-				padding: 2em;
-				display: block;
-				list-style: none;
-				overflow-y: scroll;
-			}
-
 			#canvas {
 				position: absolute;
 				top: 0px;
 				left: 0px;
-				width: 50%;
-				height: 50%;
+				width: 100%;
+				height: 100%;
 				display: block;
 				margin: 0px;
 				padding: 0px;
@@ -117,20 +99,21 @@
 
 			#map {
 				position: absolute;
-				top: 0px;
-				left: 50%;
-				width: 50%;
-				height: 50%;
+				top: 10px;
+				right: 0px;
+				width: 20%;
+				height: 20%;
 				display: block;
 				margin: 0px;
 				padding: 0px;
+				opacity: 0.5;
 			}	
 
 			.score-bar {
 				position: absolute;
-				width: 50%;
-				left: 50%;
-				top:50%;
+				width: 100%;
+				left: 0;
+				top: 0;
 				height: 10px;
 				background: #808080;
 			}
@@ -210,6 +193,7 @@
 			#chat {
 				position: absolute;
 				bottom: 0px;
+				width: 100%;
 			}
 			#chat input {
 				height: 20px;
@@ -276,15 +260,10 @@
 		<title>SDG Snake Bot</title>
 	</head>
 	<body>
-		<div id="message"></div>
 		<canvas id="canvas">Wat</canvas>
 		<canvas id="map">Wat2</canvas>
+		<div id="message"></div>
 
-		<div id="info">
-			<ul id="infolist">
-				<li>Bot info</li>
-			</ul>
-		</div>
 		<div class="score-bar">
 			<div></div>
 			<div></div>
@@ -365,7 +344,8 @@
 			var canvas = $('#canvas').get(0);
 			var mapcanvas = $('#map').get(0);
 			var width = canvas.width, height = canvas.height;
-			var mwidth = mapcanvas.width, mheight = mapcanvas.height;
+			var msize = mapcanvas.width = mapcanvas.height = Math.min(mapcanvas.width, mapcanvas.height);
+			$('#map').width(msize).height(msize);
 
 			$(window).resize(function(){
 				width = canvas.width = $(canvas).width();
@@ -406,7 +386,7 @@
 			var debugData = {"Bot info": ""};
 
 			var vBias = 0.3;
-			var hBias = 100;
+			var aggro = 200;
 
 			$('#loginform').submit(begin);
 
@@ -431,7 +411,7 @@
 					delete universe.entities[id];
 				});
 				socket.on('servermessage', function (str) {
-					$('#message').text(str);
+					$('#message').html(str);
 				});
 				socket.on('scores', function (scores) {
 
@@ -529,14 +509,6 @@
 				});
 			};
 
-			function refreshDebugData() {
-				var string = "";
-				for(x in debugData) {
-					string += "<li>" + x + ": " + debugData[x] + "</li>\n";
-				}
-				$('#info').html(string);
-			}
-
 			function canEat(e) {
 				if(e.name == name || e.mass >= head.mass * 2) return false;
 				if(e.head) {
@@ -563,8 +535,8 @@
 			function costToMoveTo(e) {
 				var distance = head.position.distanceTo(e.position);
 				var velocityBias = head.velocity.plus(head.position).distanceTo(e.position) * vBias;
-				var headBias = e.head ? 0 : hBias;
-				var total = distance + velocityBias + headBias;
+				var aggroBias = e.head || e.name ? -aggro : 0;
+				var total = distance + velocityBias + aggroBias;
 				return total;
 			}
 
@@ -614,18 +586,11 @@
 					head = newHeads[name];
 					heads = newHeads;
 
-					chooseNewTarget();
-
 					if(head) {
-						velocity = lastPos ? head.position.minus(lastPos) : Vector.zero;
-						debugData['velocity'] = Math.round(velocity.x * 100) / 100 + ", " + Math.round(velocity.y * 100) / 100;
-						debugData['position'] = Math.round(head.position.x * 100) / 100 + ", " + Math.round(head.position.y * 100) / 100;
+						chooseNewTarget();
+						socket.emit('playercontrol', target ? target.position : head.position);
+						lastPos = head.position;
 					}
-
-					socket.emit('playercontrol', target ? target.position : head.position);
-					lastPos = head.position;
-					refreshDebugData();
-
 				});
 			};
 
@@ -694,14 +659,12 @@
 				ctx.strokeStyle = "blue";
 				ctx.strokeRect(0, 0, width, height);
 
-				mtx.clearRect(0, 0, mwidth, mheight);
+				mtx.clearRect(0, 0, msize, msize);
 				mtx.fillStyle = "black";
-				mtx.fillRect(0, 0, mwidth, mheight);
+				mtx.fillRect(0, 0, msize, msize);
 				mtx.save();
 				if(head) {
-					var minScale = Math.min(mwidth / 2000, mheight / 2000);
-					mtx.translate(mwidth / 2 - minScale * 1000, mheight / 2 - minScale * 1000);
-					mtx.scale(minScale, minScale);
+					mtx.scale(msize/2000, msize/2000);
 					mtx.globalCompositeOperation = "source-over";
 
 					universe.entities.forEach(function(e) {
@@ -716,7 +679,7 @@
 				}
 				mtx.restore();
 				mtx.strokeStyle = "orange";
-				mtx.strokeRect(0, 0, mwidth, mheight);
+				mtx.strokeRect(0, 0, msize, msize);
 
 				lastt = t;
 				requestAnimationFrame(draw);
