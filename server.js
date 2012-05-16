@@ -58,6 +58,10 @@ io.sockets.on('connection', Player.listener(function() {
 		var totalPlayerMass = Object.reduce(players, function(sum, p) { return sum + (p.snake ? p.snake.mass : 0) }, 0);
 		if(totalPlayerMass <= universe.totalMass / 3)
 			this.spawnSnake();
+		else
+			this.socket.emit('servermessage', 'You\'ll have to wait for the next game');
+	} else {
+		this.socket.emit('servermessage', 'Waiting for more players');
 	}
 	this.on('quit', function() {
 		delete players[this.name];
@@ -196,16 +200,69 @@ setInterval(function() {
 }, 500);
 
 
-var cli = readline.createInterface(process.stdin, process.stdout);
-var prompt = function() {
-	cli.setPrompt("> ".grey, 2);
-	cli.prompt();
+var cli = readline.createInterface(
+	process.stdin,
+	process.stdout,
+	function (line) {
+		var playercommands = ['kick', 'kill', 'spawn', 'help'];
+		var commands = ['mass', 'balls'];
+		var allCommands = playercommands.concat(commands)
+
+		for(var i = 0; i < playercommands.length; i++) {
+			var command = playercommands[i]
+			if(line.indexOf(command) == 0) {
+				var name = line.substr(command.length + 1);
+				var completions = [];
+				Object.forEach(players, function(p, n) {
+					if(n.indexOf(name) == 0)
+						completions.push(command + ' ' + n);
+				})
+				return [completions, line];
+			}
+		}
+
+		var hits = allCommands.filter(function(c) {
+			return c.indexOf(line) == 0;
+		});
+		return [hits && hits.length ? hits : completions, line];
+	}
+);
+cli.setPrompt("> ".grey, 2);
+var log = console.log;
+console.log = function() {
+	cli.pause();
+	cli.output.write('\x1b[2K\r');
+	log.apply(console, Array.prototype.slice.call(arguments));
+	cli.resume();
+	cli._refreshLine();
 }
 cli.on('line', function(line) {
 	if(/^\s*players/.test(line)) {
-		console.log(Object.keys(players).join(', '));
+		console.log(Object.values(players).pluck('coloredName').join(', '));
 	} else if(/^\s*mass/.test(line)) {
 		console.log('Total mass of the universe: '+universe.totalMass);
+	} else if(/^\s*score/.test(line)) {
+		var width = cli.columns;
+		var perMass = width / universe.totalMass;
+		var bar = "";
+		var barLength = 0;
+		var scoreSoFar = 0;
+
+		Object.forEach(players, function(p) {
+			if(p.snake) {
+				var score = p.snake.mass;
+				scoreSoFar += score;
+				var thisBar = "";
+				while(barLength + thisBar.length < scoreSoFar * perMass)
+					thisBar += '█';
+
+				barLength += thisBar.length;
+				bar += thisBar.colored(p.color);
+			}
+		});
+
+		console.log(bar);
+		console.log(Object.values(players).pluck('coloredName').join(', '));
 	} else if(matches = /^\s*balls (\d+)/.exec(line)) {
 		generateBalls(+matches[1]);
 	} else if(matches = /^\s*kick (.+)/.exec(line)) {
@@ -219,14 +276,14 @@ cli.on('line', function(line) {
 		player && !player.snake && player.spawnSnake();
 	} else if(matches = /^\s*help (.+)/.exec(line)) {
 		var player = players[matches[1]]
-		player && player.snake && player.snake.maxMass *= 2;
+		player && player.snake && (player.snake.maxMass *= 2);
 	} else {
-		console.log("sending message");
+		console.log('sending "'.grey+line+'"'.grey);
 		io.sockets.emit('servermessage', ""+line);
 	}
-	prompt();
+	cli.prompt();
 }).on('close', function() {
 	io.sockets.emit('servermessage', 'Server going down!');
 	process.exit(0);
 });
-prompt();
+cli.prompt();

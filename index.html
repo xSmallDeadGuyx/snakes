@@ -311,7 +311,8 @@
 			</div>
 		</div>
 		<script>
-			var color = Color.randomHue();
+			var colorId = Math.random();
+			var color = Color.niceColor(colorId);
 			$('.box').css({
 				borderTopColor: color.toString(),
 				borderBottomColor: color.toString(),
