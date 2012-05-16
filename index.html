@@ -390,6 +390,8 @@
 			var vBias = 0.3;
 			var aggro = 200;
 
+			var targetDirection;
+
 			$('#loginform').submit(begin);
 
 			function begin() {
@@ -590,7 +592,14 @@
 
 					if(head) {
 						chooseNewTarget();
-						socket.emit('playercontrol', target ? target.position : head.position);
+						
+						var pos = head.position;
+						if(target) {
+							targetDirection = - Math.PI / 2 + Math.atan2(target.position.x - head.position.x, target.position.y - head.position.y);
+							pos = new Vector(head.position.x + 1000 * Math.cos(targetDirection), head.position.y - 1000 * Math.sin(targetDirection));
+							//pos = target.position;
+						}
+						socket.emit('playercontrol', pos);
 						lastPos = head.position;
 					}
 				});
@@ -626,6 +635,25 @@
 
 				ctx.translate(-viewOrigin.x, -viewOrigin.y);
 				ctx.globalCompositeOperation = "source-over";
+
+				if(head) {
+					ctx.fillStyle = "red";
+					ctx.beginPath();
+					ctx.moveTo(head.position.x, head.position.y);
+					ctx.lineTo(target.position.x, target.position.y);
+					ctx.lineTo(target.position.x + 1, target.position.y)
+					ctx.fill();
+					if(targetDirection) {
+						ctx.fillStyle = "green";
+						ctx.beginPath();
+						var x = head.position.x + 1000 * Math.cos(targetDirection);
+						var y = head.position.y - 1000 * Math.sin(targetDirection);
+						ctx.moveTo(head.position.x, head.position.y);
+						ctx.lineTo(x, y);
+						ctx.lineTo(x + 1, y)
+						ctx.fill();
+					}
+				}
 
 				ctx.globalCompositeOperation = "lighter";
 				universe.entities.forEach(function(e) {
