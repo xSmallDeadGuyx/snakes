@@ -123,6 +123,9 @@
    				outline: none;
    				background-color: transparent;
 			}
+			#login button {
+				display: none;
+			}
 			#about .box{
 				width: 80%;
 			}
@@ -190,28 +193,17 @@
 				right: 0;
 				bottom: 0;
 			}
-			#canvas {
+			canvas {
 				width: 100%;
 				height: 100%;
 				display: block;
 			}
-			#minimap {
-				position: absolute;
-				opacity: 0.5;
-				top: 0;
-				right: 0;
-				width: 200px;
-				height: 200px;
-			}
 		</style>
 
-		<title>SDG Snake Bot</title>
+		<title>Snakes - A multiplayer game written in javascript using the HTML5 canvas, node.js, and Socket.IO</title>
 	</head>
 	<body>
-		<div id="wrapper">
-			<canvas id="canvas">If you can see this, your browser sucks</canvas>
-			<canvas id="minimap">If you can see this, your browser sucks</canvas>
-		</div>
+		<div id="wrapper"><canvas id="canvas">If you can see this, your browser sucks</canvas></div>
 		<div id="top">
 			<div id="message"></div>
 			<div class="score-bar">
@@ -233,13 +225,13 @@
 		<div id="login" class="vertical-center">
 			<div>
 				<div class="box">
-					<h1>SDG Snake Bot</h2>
-					<p>A bot for the snake game by <a href="http://eric-wieser.tk/">Eric Wieser</a>, just sit back and watch it win. <a href="#" id="about-link">About Snakes</a>.</p>
+					<h1>Snakes</h2>
+					<p>Control the snake by moving the mouse - no clicking required. Eat other snakes, or be eaten. <a href="#" id="about-link">About</a>.</p>
 					<form id="join">
-						Name: <input id="name" value="sdg-bot" placeholder="Enter your name here" autocomplete="off" autofocus="autofocus" /><br />
-						Server: <input id="server" value="http://localhost:8090" placeholder="Enter server address here" autocomplete="off" /><br />
-						<div style="text-align: center"><button type="submit">Join the game</button></div>
+						<button type="submit">Join the game</button>
+						<input id="name" placeholder="Enter your name here" autocomplete="off" autofocus="autofocus" />
 					</form>
+					<small>Type your name above, and press Enter to join the game</small>
 				</div>
 			</div>
 		</div>
@@ -294,10 +286,6 @@
 			var canvas = $('#canvas').get(0);
 			var width = canvas.width, height = canvas.height;
 
-			var minimap = $('#minimap').get(0);
-			var msize = minimap.width;
-			minimap.height = msize;
-
 			$(window).resize(function(){
 				width = canvas.width = $(canvas).width();
 				height = canvas.height = $(canvas).height();
@@ -309,7 +297,6 @@
 			// }).resize();
 
 			var ctx = canvas.getContext('2d');
-			var mtx = minimap.getContext('2d');
 			var ball;
 			var opponents = {};
 
@@ -322,17 +309,14 @@
 
 			var universe = new World(2000, 2000);
 
-			var target;
-			var targetTimer = 0;
-			var ignoring;
+
 
 			//var socket = io.connect('http://42nd.org:8090');
-			var socket;
+			var socket = io.connect('http://localhost:8090');
 			var name;
 			var head;
 			var heads;
 			var viewOrigin = Vector.zero;
-
 			function nextViewOrigin() {
 				var x, y
 				if(!head) {
@@ -360,199 +344,124 @@
 				return new Vector(x, y);
 			}
 			var nameinput = $('#name');
-			var serverinput = $('#server');
 			if(localStorage['name'])
 				nameinput.val(localStorage['name']);
-			if(localStorage['server'])
-				serverinput.val(localStorage['server']);
 
 			var isTrying = false;
 			var playing = false;
 
 			$('#join').submit(function() {
-				socket = io.connect(serverinput.val());
-				localStorage['server'] = serverinput.val();
-				localStorage['name'] = nameinput.val();
-
-				// socket.on('entityadded', function (data) {
-				// 	if(data.i in universe.entities) return;
-
-				// 	var b = new Ball(
-				// 		Vector.ify(data.p),
-				// 		data.r,
-				// 		Color.ify(data.c)
-				// 	);
-				// 	b._id = data.i; //probably going to regret this
-				// 	universe.addEntity(b);
-				// });
-				// socket.on('entitylost', function (id) {
-				// 	delete universe.entities[id];
-				// });
-				socket.on('servermessage', function (str) {
-					$('#message').html(str);
-				});
-
-				socket.on('scores', function (scores) {
-					//Get the DOM elements
-					var scoreList = $('#scores').empty();
-					var scoreBar = $('.score-bar').empty();
-
-					//Keep track of left and rightmost bars
-					var mostLeft = 0;
-					var mostRight = 0;
-
-					scores.forEach(function(score, i) {
-						score = { name: score[0], value: score[1], color: score[2] };
-						//Add names to scoreboard
-						$('<li />').append(
-							$('<span class="name"/>').text(score.name), " ", 
-							$('<span />').text(score.value)
-						).css('color', score.color).appendTo(scoreList);
-
-						//Pad out the bar, alternating sides
-						if(i%2 == 0) {
-							//left
-							$('<div />').css({
-								backgroundColor: score.color,
-								width: (score.value / 10) + '%',
-								left:  (mostLeft    / 10) + '%'
-							}).appendTo(scoreBar);
-							mostLeft += score.value;
-						}
-						else {
-							//right
-							$('<div />').css({
-								backgroundColor: score.color,
-								width: (score.value / 10) + '%',
-								right: (mostRight   / 10) + '%'
-							}).appendTo(scoreBar);
-							mostRight += score.value;
-						}
-					});
-				});
-
-				socket.on('entityupdates', function (data) {
-					Object.forEach(data.e, function(edata, id) {
-						var p = Vector.ify(edata.p);
-						var c = Color.ify(edata.c);
-						var r = edata.r;
-						if(+id in universe.entities) {
-							var e = universe.entities[+id];
-							e.position = p;
-							e.color = c;
-							e.radius = r;
-							e.name = edata.n;
-							e.head = edata.h;
-						} else {
-							var b = new Ball(p,	r, c);
-							b.name = edata.n;
-							b.head = edata.h;
-							b._id = +id;
-							universe.entities[+id] = b;
-						}
-					});
-					for(id in universe.entities)
-						if(!(id in data.e))
-							delete universe.entities[id];
-
-					var newHeads = {};
-					Object.forEach(data.s, function(id, name) {
-						newHeads[name] = universe.entities[id];
-					});
-					head = newHeads[name];
-					heads = newHeads;
-
-					if(playing) {
-						var lastTarget = target;
-						chooseNewTarget(false);
-						if(target == lastTarget) targetTimer++;
-						else targetTimer = 0;
-						if(targetTimer > 300) {
-							chooseNewTarget(true);
-							targetTimer = 0;
-						}
-
-						var pos = head.position;
-						if(target) {
-							targetDirection = - Math.PI / 2 + Math.atan2(target.position.x - head.position.x, target.position.y - head.position.y);
-							pos = new Vector(head.position.x + 1000 * Math.cos(targetDirection), head.position.y - 1000 * Math.sin(targetDirection));
-						}
-						socket.emit('playercontrol', pos);
-					}
-				});
-
-				socket.on('chat', function (data) {
-					var name = data.n;
-					var color = Color.ify(data.c);
-					var message = data.m;
-					var history = $('#chat .history');
-					//alert(name + ":" + message);
-					$('<li />').text(' '+message).prepend(
-						$('<span />').css('color', color+"").text(name)
-					).appendTo('#chat .history');
-
-					while(history.children().size() > 10)
-						history.children().first().remove();
-				});
-
 				//Stop things happening while the response is being waited for
-				var i = 1;
 				if(!isTrying) {
 					isTrying = true;
-					n = nameinput.val() + (i > 1 ? i : '');
+					n = nameinput.val();
 
 					socket.emit('join', {name: n, color: colorId}, function(data) {
 						if(data === true) {
-							name = n;
+							localStorage['name'] = name = n;
 							$('#login').fadeOut(function() {
 								isTrying = false;
 								playing = true;
 							});
+						} else if(data instanceof Object && data.error) {
+							alert(data.error)
 						}
-						else i++; 
 					});
 				}
 				return false;
 			});
 
-			function canEat(e) {
-				if(e.name == name || e.mass >= head.mass * 2) return false;
-				if(e.head) {
-					for(id in universe.entities) {
-						var e2 = universe.entities[id];
-						if(e2.name == e.name && e2 != e) {
-							return false;
-						}
-					}
-					return e.mass * 2 < head.mass;
-				}
-				return true;
-			}
+			// socket.on('entityadded', function (data) {
+			// 	if(data.i in universe.entities) return;
 
-			function costToMoveTo(e) {
-				var distance = head.position.distanceTo(e.position);
-				var aggro = e.head ? -200 : e.name ? -100 : 0;
-				return distance + aggro;
-			}
+			// 	var b = new Ball(
+			// 		Vector.ify(data.p),
+			// 		data.r,
+			// 		Color.ify(data.c)
+			// 	);
+			// 	b._id = data.i; //probably going to regret this
+			// 	universe.addEntity(b);
+			// });
+			// socket.on('entitylost', function (id) {
+			// 	delete universe.entities[id];
+			// });
+			socket.on('servermessage', function (str) {
+				$('#message').html(str);
+			});
+			socket.on('scores', function (scores) {
+				//Get the DOM elements
+				var scoreList = $('#scores').empty();
+				var scoreBar = $('.score-bar').empty();
 
-			function chooseNewTarget(ignoreCurrent) {
-				if(ignoreCurrent) {
-					ignoring = target;
-					window.setTimeout(function() {ignoring = undefined;}, 5000);
-				}
-				var cost = -1;
-				var lowest;
-				for(id in universe.entities) {
-					var e = universe.entities[id];
-					if(!e.position || !canEat(e) || e == ignoring) continue;
-					var c = costToMoveTo(e);
-					if(cost == -1 || c < cost) {
-						cost = c;
-						lowest = e;
+				//Keep track of left and rightmost bars
+				var mostLeft = 0;
+				var mostRight = 0;
+
+				scores.forEach(function(score, i) {
+					score = { name: score[0], value: score[1], color: score[2] };
+					//Add names to scoreboard
+					$('<li />').append(
+						$('<span class="name"/>').text(score.name), " ", 
+						$('<span />').text(score.value)
+					).css('color', score.color).appendTo(scoreList);
+
+					//Pad out the bar, alternating sides
+					if(i%2 == 0) {
+						//left
+						$('<div />').css({
+							backgroundColor: score.color,
+							width: (score.value / 10) + '%',
+							left:  (mostLeft    / 10) + '%'
+						}).appendTo(scoreBar);
+						mostLeft += score.value;
 					}
-				}
-				if(lowest) target = lowest;
-			}
+					else {
+						//right
+						$('<div />').css({
+							backgroundColor: score.color,
+							width: (score.value / 10) + '%',
+							right: (mostRight   / 10) + '%'
+						}).appendTo(scoreBar);
+						mostRight += score.value;
+					}
+				});
+			});
+			socket.on('entityupdates', function (data) {
+				Object.forEach(data.e, function(edata, id) {
+					var p = Vector.ify(edata.p);
+					var c = Color.ify(edata.c);
+					var r = edata.r;
+					if(+id in universe.entities) {
+						var e = universe.entities[+id];
+						e.position = p;
+						e.color = c;
+						e.radius = r;
+					} else {
+						var b = new Ball(p,	r, c);
+						b._id = +id;
+						universe.entities[+id] = b;
+					}
+				});
+				for(id in universe.entities)
+					if(!(id in data.e))
+						delete universe.entities[id];
+
+				var newHeads = {};
+				Object.forEach(data.s, function(id, name) {
+					newHeads[name] = universe.entities[id];
+				});
+				head = newHeads[name];
+				heads = newHeads;
+
+				if(playing) socket.emit('playercontrol', target.plus(viewOrigin));
+			});
+			var target = new Vector();
+			$(document).mousemove(function(e) {
+				var offset = $(canvas).offset();
+				target.set(e.pageX - offset.left, e.pageY - offset.top);
+			}).keydown(function() {
+				if(playing) $('#chat input').focus();
+			});
 
 			$('#chat').submit(function() {
 				if(playing) {
@@ -564,6 +473,19 @@
 				return false;
 			});
 
+			socket.on('chat', function (data) {
+				var name = data.n;
+				var color = Color.ify(data.c);
+				var message = data.m;
+				var history = $('#chat .history');
+				//alert(name + ":" + message);
+				$('<li />').text(' '+message).prepend(
+					$('<span />').css('color', color+"").text(name)
+				).appendTo('#chat .history');
+
+				while(history.children().size() > 10)
+					history.children().first().remove();
+			});
 			function drawArrow(x, y, angle) {
 				ctx.save();
 				ctx.translate(x, y);
@@ -574,18 +496,6 @@
 				ctx.lineTo(20, 7.5);
 				ctx.restore();
 			}
-
-			function drawArrowWithOffset(x, y, angle, offset) {
-				ctx.save();
-				ctx.translate(x, y);
-				ctx.rotate(angle);
-				ctx.beginPath();
-				ctx.moveTo(-offset, 0);
-				ctx.lineTo(20 - offset, -7.5);
-				ctx.lineTo(20 - offset, 7.5);
-				ctx.restore();
-			}
-
 			var lastt = Date.now();
 			function draw(t) {
 				//Calculate frame time
@@ -627,32 +537,9 @@
 						ctx.fill();
 					}
 				});
-				if(target && head) {
-					ctx.fillStyle = color+"";
-					drawArrowWithOffset(head.position.x, head.position.y, Math.PI - targetDirection, head.radius + 30);
-					ctx.fill();
-				}
-				ctx.restore();
-
-				mtx.clearRect(0, 0, msize, msize);
-				mtx.save();
-
-				mtx.fillStyle = "black";
-				mtx.fillRect(0, 0, msize, msize);
-				mtx.strokeStyle = color+"";
-				mtx.strokeRect(0, 0, msize, msize);
-
-				mtx.scale(msize/2000, msize/2000);
-
-				mtx.globalCompositeOperation = "lighter";
-				universe.entities.forEach(function(e) {
-					e.drawTo(mtx);
-				});
-				mtx.restore();
-
 				//prepare for next frame
 				lastt = t;
-
+				ctx.restore();
 				requestAnimationFrame(draw);
 			}
 			requestAnimationFrame(draw);
