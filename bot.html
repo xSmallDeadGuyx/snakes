@@ -391,6 +391,9 @@
 				socket.on('servermessage', function (str) {
 					$('#message').html(str);
 				});
+				socket.on('ping', function() {
+					socket.emit('ping');	
+				});
 
 				socket.on('scores', function (scores) {
 					//Get the DOM elements
@@ -513,6 +516,10 @@
 					});
 				}
 				return false;
+			});
+
+			$(document).keydown(function() {
+				if(playing) $('#chat input').focus();
 			});
 
 			function canEat(e) {
