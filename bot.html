@@ -323,6 +323,8 @@
 			var universe = new World(2000, 2000);
 
 			var target;
+			var specificTarget = false;
+			var timeout = 300;
 			var targetTimer = 0;
 			var ignoring;
 
@@ -332,6 +334,8 @@
 			var head;
 			var heads;
 			var viewOrigin = Vector.zero;
+
+			var newHeads;
 
 			function nextViewOrigin() {
 				var x, y
@@ -458,22 +462,35 @@
 						}
 					});
 					for(id in universe.entities)
-						if(!(id in data.e))
+						if(!(id in data.e)) {
+							if(target && id == target._id) target = undefined;
 							delete universe.entities[id];
+						}
 
-					var newHeads = {};
+					newHeads = {};
 					Object.forEach(data.s, function(id, name) {
 						newHeads[name] = universe.entities[id];
 					});
 					head = newHeads[name];
 					heads = newHeads;
 
-					if(playing) {
+					if(playing && head) {
+						if(specificTarget) {
+							if(newHeads[specificTarget] && target != newHeads[specificTarget]) {
+								target = newHeads[specificTarget];
+								targetTimer = 0;
+							}
+							else if(!newHEads[specificTarget] && target.name != specificTarget) {
+								resetTarget();
+							}
+						}
+
 						var lastTarget = target;
-						chooseNewTarget(false);
+						if(!specificTarget || !target) chooseNewTarget(false);
 						if(target == lastTarget) targetTimer++;
 						else targetTimer = 0;
-						if(targetTimer > 300) {
+						if(targetTimer > timeout || !target) {
+							delete specificTarget;
 							chooseNewTarget(true);
 							targetTimer = 0;
 						}
@@ -564,12 +581,43 @@
 				if(lowest) target = lowest;
 			}
 
+			function resetTarget() {
+				targetTimer = 0;
+				timeout = 300;
+				target = undefined;
+				specificTarget = undefined;
+			}
+
 			$('#chat').submit(function() {
 				if(playing) {
 					var input = $(this).find('input');
 					var msg = input.val();
+					if(/\/\w+/.test(msg)) {
+						var args = msg.replace(/\/\w+\s+/, '');
+						var cmd = msg.substring(1, msg.indexOf(args)).trim();
+						if(cmd.toLowerCase() == 'target') {
+							var name = args.replace(/\s+\d+$/, '');
+							var timer = args.replace(/.*?[^\d]+\s+/, '');
+							if(newHeads[name]) {
+								target = newHeads[name];
+								specificTarget = name;
+							}
+							if(/^\d+$/.test(timer)) {
+								timeout = parseInt(args);
+							}
+
+						}
+						if(cmd.toLowerCase() == 'timeout') {
+							timeout = parseInt(args);
+						}
+						if(cmd.toLowerCase() == 'reset') {
+							resetTarget();
+						}
+					}
+					else {
+						socket.emit('chat', msg);
+					}
 					input.val('');
-					socket.emit('chat', msg);
 				}
 				return false;
 			});
