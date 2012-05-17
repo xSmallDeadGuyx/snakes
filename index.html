@@ -252,6 +252,13 @@
 			</div>
 		</div>
 		<script>
+			var events = require('events');
+			require('./color');
+			require('./snake');
+			require('./world');
+			require('./ball');
+			require('./entity');
+
 			var colorId = Math.random();
 			var color = Color.niceColor(colorId);
 			$('.box').css({

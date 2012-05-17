@@ -74,40 +74,14 @@ Player.prototype.spawnSnake = function(world) {
 		);
 		snake.owner = this;
 		snake.target = snake.head.position.clone();
-		snake.onDeath.playerDeath = function(killer) {
+		snake.on('death', function(killer) {
 			$this.snake = null;
 			$this.emit('death', 'enemy', killer.owner)
-		};
-		snake.onBallEaten.notify = function(ball, type) {
-			if(type == "tail" && ball.ownerSnake && ball.ownerSnake.owner)
-				util.log($this.coloredName +" ate some of "+ball.ownerSnake.owner.coloredName);
-		}
-		this.snake = snake;
-	}
-}
-
-//returns a function that listens to a socket, and calls onJoined when a player joins
-Player.listener = function(onJoined) {
-	return function(socket) {
-		var gotResponse = false;
-		socket.on('join', function(data, callback) {
-			if(gotResponse) return;
-
-			var name = data.name;
-			if(typeof name != "string") return;
-
-			name = name.replace(/^\s+|\s+$/, '');
-			if(name.length < 3 || name.length > 64) {
-				callback({error: "Name length invalid"});
-			} else if(!(name in players)) {
-				gotResponse = true;
-				onJoined.call(new Player(socket, name, Color.niceColor(data.color)));
-				callback(true);
-			} else {
-				//Name already taken
-				callback({error: "Someone else has that name"});
-				console.log();
-			}
 		});
+		snake.on('eat.tail', function(ball) {
+			if(ball.ownerSnake && ball.ownerSnake.owner)
+				util.log($this.coloredName +" ate some of "+ball.ownerSnake.owner.coloredName);
+		});
+		this.snake = snake;
 	}
 }

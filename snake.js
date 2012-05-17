@@ -1,4 +1,11 @@
+require('./util');
+var util = require('util');
+var events = require('events');
+
 Snake = function Snake(length, color, pos, world) {
+    events.EventEmitter.call(this);
+	this.onHeadHit = Snake.onHeadHit.bind(this);
+
 	var ballSize = 10;
 	this.color = color;
 	this.balls = [];
@@ -11,37 +18,40 @@ Snake = function Snake(length, color, pos, world) {
 	this.balls.forEach(function(b) {
 		this.world.addEntity(b);
 	}, this);
-	Object.defineEvent(this, 'onDeath');
-	Object.defineEvent(this, 'onBallEaten');
 }
-var onHeadHit = function(thing) {
+util.inherits(Snake, events.EventEmitter);
+
+Snake.onHeadHit = function(thing, cancel) {
 	var that = thing.ownerSnake;
 	if(that == undefined) {
 		if(this.eat(thing)) {
-			this.onBallEaten(thing, "free");
-			return false; //prevent balls interacting
+			this.emit('eat.free', thing);
+
+			cancel(); //prevent balls interacting
 		}
 	}
 	else if(that != this) {
 		if(thing == that.head) {
 			if(that.length == 1 && this.head.mass > that.head.mass*2) {
+				this.emit('eat.head', thing);
 				this.eat(thing);
 				that.balls = [];
-				this.onBallEaten(thing, "head");
 				that.destroy();
-				that.onDeath(this);
-				return false;
+				that.emit('death', this);
+
+				cancel();
 			}
 		}
 		else if(this.canEat(thing)) {
+			this.emit('eat.tail', thing);
 			that.eatenAt(thing);
 			this.eat(thing);
-			this.onBallEaten(thing, "tail");
-			return false;
+
+			cancel();
 		}
 	}
-	return true;
 }
+
 Object.defineProperty(Snake.prototype, 'tail', {
 	get: function() { return this.balls[this.balls.length - 1]; }
 });
@@ -53,13 +63,13 @@ Object.defineProperty(Snake.prototype, 'head', {
 			var force = Vector.zero
 			if(current) {
 				force  = current.forces.player;
-				delete current.onInteracted.eat;
+				current.removeListener('interaction', this.onHeadHit);
 				delete current.forces.player;
 			} 
 			if(h) {
 				var snake = this;
 				h.forces.player = force
-				h.onInteracted.eat = function(x) {return onHeadHit.call(snake, x);}
+				h.on('interaction', this.onHeadHit);
 				h.ownerSnake = this;
 			}
 			this._head = h;
