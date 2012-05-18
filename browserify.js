@@ -958,7 +958,7 @@ var util = require('util');
 var events = require('events');
 
 Snake = function Snake(length, color, pos, world) {
-    events.EventEmitter.call(this);
+	events.EventEmitter.call(this);
 	this.onHeadHit = Snake.onHeadHit.bind(this);
 
 	var ballSize = 10;
@@ -995,7 +995,7 @@ Snake.onHeadHit = function(thing, cancelled) {
 				that.balls = [];
 				that.destroy();
 
-				that.emit('death', this); //THIS MUST GO BEFORE.destroy()!!!
+				that.emit('death', this);
 
 				cancelled(true);
 			}
@@ -1148,24 +1148,17 @@ Snake.prototype.update = function(dt) {
 });
 
 require.define("/util.js", function (require, module, exports, __dirname, __filename) {
-Object.values = function(obj) {
-	var values = [];
-	Object.forEach(obj, function(v) { values.push(v) });
-	return values;
-}
-Object.reduce = function(obj, f, start, thisPtr) {
-	current = start || 0;
-	for(var k in obj) {
-		if(obj.hasOwnProperty(k)) {
-			current = f.call(thisPtr, current, obj[k], k, obj)
-		}
-	}
-	return current;
-};
-
 Array.prototype.contains = function(x) { return this.indexOf(x) != -1; };
 Array.prototype.pluck = function(prop) { return this.map(function(x) { return x[prop]; }); };
 
+Array.prototype.forAdjacentPairs = function(callback, thisPtr) {
+	var l = this.length;
+	for (var i = 0, j = 1; j < l; i = j++) {
+		var ti = this[i], tj = this[j];
+		if(ti !== undefined && tj !== undefined)
+			callback.call(thisPtr, ti, tj, i, j, this);
+	}
+};
 Array.prototype.forEveryPair = function(callback, thisPtr) {
 	var l = this.length;
 	for(var i = 0; i < l; i++) {
@@ -1186,7 +1179,23 @@ Array.prototype.remove = function(element) {
 		}
 	}
 	return false;
-}
+};
+
+Object.values = function(obj) {
+	var values = [];
+	Object.forEach(obj, function(v) { values.push(v) });
+	return values;
+};
+Object.size = function(obj) { var i = 0; for(var k in obj) ++i; return i; }
+Object.reduce = function(obj, f, start, thisPtr) {
+	current = start || 0;
+	for(var k in obj) {
+		if(obj.hasOwnProperty(k)) {
+			current = f.call(thisPtr, current, obj[k], k, obj)
+		}
+	}
+	return current;
+};
 Object.forEach = function(obj, f, thisPtr) {
 	for(var i in obj) {
 		var oi = obj[i];
@@ -1194,7 +1203,7 @@ Object.forEach = function(obj, f, thisPtr) {
 			f.call(thisPtr, oi, i, obj);
 		}
 	}
-}
+};
 Object.some = function(obj, f, thisPtr) {
 	for(var i in obj) {
 		var oi = obj[i];
@@ -1203,7 +1212,7 @@ Object.some = function(obj, f, thisPtr) {
 		}
 	}
 	return false;
-}
+};
 Object.every = function(obj, f, thisPtr) {
 	for(var i in obj) {
 		var oi = obj[i];
@@ -1212,7 +1221,7 @@ Object.every = function(obj, f, thisPtr) {
 		}
 	}
 	return true;
-}
+};
 Object.forEachPair = function(obj, f, thisPtr) {
 	for(var i in obj) {
 		for(var j in obj) {
@@ -1222,22 +1231,11 @@ Object.forEachPair = function(obj, f, thisPtr) {
 			}
 		}
 	}
-}
-Array.prototype.forAdjacentPairs = function(callback, thisPtr) {
-	var l = this.length;
-	for (var i = 0, j = 1; j < l; i = j++) {
-		var ti = this[i], tj = this[j];
-		if(ti !== undefined && tj !== undefined)
-			callback.call(thisPtr, ti, tj, i, j, this);
-	}
-};
-Array.prototype.pluck = function(property) {
-	return this.map(function(x) {return x[property]; });
 };
 Object.isEmpty = function(obj) {
 	for (var prop in obj) if (obj.hasOwnProperty(prop)) return false;
 	return true;
-}
+};
 });
 
 require.define("/vector.js", function (require, module, exports, __dirname, __filename) {
@@ -1468,7 +1466,7 @@ Ball.prototype.bounceOffWalls = function(width, height) {
 };
 
 Ball.prototype.interactWith = function(that) {
-	if(this.following == that || that.following == this) return false;
+	if(this.following == that || that.following == this) { return false; } 
 	else {
 		var diff = this.position.minus(that.position);
 		var dist = diff.length;
@@ -1492,6 +1490,15 @@ Ball.prototype.clearForces = function() {
 	Entity.prototype.clearForces.call(this);
 	this.forces.contact = {};
 	this.forces.following = {};
+
+	if(this.following) {
+		delete this.following.followedBy;
+		delete this.following;
+	}
+	if(this.followedBy) {
+		delete this.followedBy.following;
+		delete this.followedBy;
+	}
 }
 
 Ball.prototype.drawTo = function(ctx) {
@@ -1505,7 +1512,8 @@ Ball.prototype.drawTo = function(ctx) {
 };
 
 Ball.prototype.follow = function(that) {
-	this.following = that
+	this.following = that;
+	that.followedBy = this;
 
 	target = this.position.minus(that.position)
 		.normalize()
@@ -1536,7 +1544,7 @@ util.inherits(Entity, events.EventEmitter);
 
 Entity.allowInteraction = function(a, b) {
 	var allow = true;
-	var cancelled = function(x) { if(x) allow = false; else return !allow; }
+	var cancelled = function(x) { if(x) { allow = false; } else return !allow; }
 	a.emit('interaction', b, cancelled)
 	b.emit('interaction', a, cancelled)
 	return allow;

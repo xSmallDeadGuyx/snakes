@@ -8,7 +8,7 @@
 		<meta property="og:image" content="http://eric-wieser.tk/images/snaps/snakes.png" />
 		<meta property="fb:admins" content="eric.wieser"/>
 		<link rel="shortcut icon" href="/favicon.png">
-		<script src="/socket.io/socket.io.js"></script>
+		<script src="socket.io/socket.io.js"></script>
 		<script src="browserify.js"></script>
 		<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Dosis:300,600|Ubuntu" />
 		<style>
@@ -183,34 +183,40 @@
 			}
 			#wrapper {
 				position: absolute;
+				padding: 0;
+				margin: 0;
 				top: 10px;
 				left: 0;
 				right: 0;
 				bottom: 0;
 			}
-			canvas {
+			#canvas {
 				width: 100%;
 				height: 100%;
 				display: block;
+				padding: 0;
+				margin: 0;
+			}
+			#minimap {
+				position: absolute;
+				display: block;
+				padding: 0;
+				margin: 0;
+				top: 0;
+				right: 0;
+				opacity: 0.5;
+				width: 200px;
+				height: 200px;
 			}
 		</style>
 
 		<title>Snakes - A multiplayer game written in javascript using the HTML5 canvas, node.js, and Socket.IO</title>
-		<script type="text/javascript">
-		var _gaq = _gaq || [];
-		_gaq.push(['_setAccount', 'UA-24953524-2']);
-		_gaq.push(['_setDomainName', 'eric-wieser.tk']);
-		_gaq.push(['_trackPageview']);
-
-		(function() {
-			var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-			ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-			var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-		})();
-		</script>
 	</head>
 	<body>
-		<div id="wrapper"><canvas id="canvas">If you can see this, your browser sucks</canvas></div>
+		<div id="wrapper">
+			<canvas id="canvas">If you can see this, your browser sucks</canvas>
+			<canvas id="minimap">If you can see this, your browser sucks</canvas>
+		</div>
 		<div id="top">
 			<div id="message"></div>
 			<div class="score-bar">
@@ -298,6 +304,7 @@
 
 			//Get canvas stuff
 			var canvas = $('#canvas').get(0);
+			var minimap = $('#minimap').get(0);
 			var width = canvas.width, height = canvas.height;
 
 			$(window).resize(function(){
@@ -311,6 +318,7 @@
 			// }).resize();
 
 			var ctx = canvas.getContext('2d');
+			var mtx = minimap.getContext('2d');
 			var ball;
 			var opponents = {};
 
@@ -517,6 +525,19 @@
 				ctx.lineTo(20, 7.5);
 				ctx.restore();
 			}
+
+			function isHead(e) {
+				for(id in heads)
+					if(heads[id] == e) return true;
+				return false;
+			}
+
+			function canEat(e) {
+				if(isHead(e) && e.mass * 2 > head.mass) return false;
+				else if(e.mass >= head.mass * 2) return false;
+				return true;
+			}
+
 			var lastt = Date.now();
 			function draw(t) {
 				//Calculate frame time
@@ -533,6 +554,15 @@
 				ctx.globalCompositeOperation = "lighter";
 				universe.entities.forEach(function(e) {
 					e.drawTo(ctx);
+
+					if(canEat(e)) {
+						ctx.save();
+						ctx.strokeStyle = "green";
+						ctx.beginPath();
+						ctx.arc(e.position.x, e.position.y, e.radius + 2, 0, Math.PI * 2, false);
+						ctx.stroke();
+						ctx.restore();
+					}
 				});
 				Object.forEach(heads, function(h) {
 					var off = {
@@ -574,6 +604,23 @@
 				//prepare for next frame
 				lastt = t;
 				ctx.restore();
+
+				mtx.clearRect(0, 0, minimap.width, minimap.height);
+				mtx.save();
+
+				mtx.scale(minimap.width/2000, minimap.height/2000);
+				mtx.globalCompositeOperation = "source-over";
+				mtx.fillStyle = "black";
+				mtx.fillRect(0, 0, 2000, 2000);
+
+				mtx.globalCompositeOperation = "lighter";
+				universe.entities.forEach(function(e) {
+					e.drawTo(mtx);
+				});
+				mtx.restore();
+				mtx.strokeStyle = color+"";
+				mtx.strokeRect(0, 0, minimap.width, minimap.height);
+
 				requestAnimationFrame(draw);
 			}
 			requestAnimationFrame(draw);
