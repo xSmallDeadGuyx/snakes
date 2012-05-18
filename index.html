@@ -8,13 +8,8 @@
 		<meta property="og:image" content="http://eric-wieser.tk/images/snaps/snakes.png" />
 		<meta property="fb:admins" content="eric.wieser"/>
 		<link rel="shortcut icon" href="/favicon.png">
-		<script src="socket.io/socket.io.js"></script>
-		<script src="util.js"></script>
-		<script src="vector.js"></script>
-		<script src="entity.js"></script>
-		<script src="color.js"></script>
-		<script src="ball.js"></script>
-		<script src="world.js"></script>
+		<script src="/socket.io/socket.io.js"></script>
+		<script src="browserify.js"></script>
 		<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Dosis:300,600|Ubuntu" />
 		<style>
 			html, body {
@@ -201,6 +196,18 @@
 		</style>
 
 		<title>Snakes - A multiplayer game written in javascript using the HTML5 canvas, node.js, and Socket.IO</title>
+		<script type="text/javascript">
+		var _gaq = _gaq || [];
+		_gaq.push(['_setAccount', 'UA-24953524-2']);
+		_gaq.push(['_setDomainName', 'eric-wieser.tk']);
+		_gaq.push(['_trackPageview']);
+
+		(function() {
+			var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+			ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+			var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+		})();
+		</script>
 	</head>
 	<body>
 		<div id="wrapper"><canvas id="canvas">If you can see this, your browser sucks</canvas></div>
@@ -316,10 +323,10 @@
 
 			var universe = new World(2000, 2000);
 
-
+			
 
 			//var socket = io.connect('http://42nd.org:8090');
-			var socket = io.connect('http://localhost:8090');
+			var socket = io.connect('http://42nd.org:8090');
 			var name;
 			var head;
 			var heads;

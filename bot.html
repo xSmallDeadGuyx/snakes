@@ -9,12 +9,7 @@
 		<meta property="fb:admins" content="eric.wieser"/>
 		<link rel="shortcut icon" href="/favicon.png">
 		<script src="socket.io/socket.io.js"></script>
-		<script src="util.js"></script>
-		<script src="vector.js"></script>
-		<script src="entity.js"></script>
-		<script src="color.js"></script>
-		<script src="ball.js"></script>
-		<script src="world.js"></script>
+		<script src="browserify.js"></script>
 		<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Dosis:300,600|Ubuntu" />
 		<style>
 			html, body {
@@ -260,6 +255,13 @@
 			</div>
 		</div>
 		<script>
+			var events = require('events');
+			require('./color');
+			require('./snake');
+			require('./world');
+			require('./ball');
+			require('./entity');
+
 			var colorId = Math.random();
 			var color = Color.niceColor(colorId);
 			$('.box').css({
@@ -480,7 +482,7 @@
 								target = newHeads[specificTarget];
 								targetTimer = 0;
 							}
-							else if(!newHEads[specificTarget] && target.name != specificTarget) {
+							else if(!newHeads[specificTarget] && target.name != specificTarget) {
 								resetTarget();
 							}
 						}
@@ -588,6 +590,17 @@
 				specificTarget = undefined;
 			}
 
+			function getUniqueName(check) {
+				var found;
+				for(n in newHeads) {
+					if(n.toLowerCase().indexOf(check.toLowerCase()) == 0) {
+						if(found) return undefined;
+						found = n;
+					}
+				}
+				return found;
+			}
+
 			$('#chat').submit(function() {
 				if(playing) {
 					var input = $(this).find('input');
@@ -620,6 +633,19 @@
 					input.val('');
 				}
 				return false;
+			}).live('keydown', function(e) { 
+				var keyCode = e.keyCode || e.which; 
+
+				if (keyCode == 9) { 
+					e.preventDefault();
+					
+					var v = $('#chat input').val()
+					var n = v;
+					if(/.*?\s+.*$/.test(n))
+						n = /.*?\s+(.*)$/.exec(v)[1];
+					var f = getUniqueName(n);
+					if(f) $('#chat input').val(v.replace(n, f));
+				} 
 			});
 
 			function drawArrow(x, y, angle) {
